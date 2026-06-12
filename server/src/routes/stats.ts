@@ -34,6 +34,7 @@ router.get('/summary', roleMiddleware('counselor'), (req: Request, res: Response
         COUNT(*) as total,
         SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
         SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+        SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_count,
         SUM(CASE WHEN status = 'unchecked' THEN 1 ELSE 0 END) as unchecked_count
       FROM check_records WHERE task_id = ?
     `).get(task.id) as any;
@@ -46,6 +47,7 @@ router.get('/summary', roleMiddleware('counselor'), (req: Request, res: Response
       total: stats.total,
       present: stats.present_count,
       absent: stats.absent_count,
+      leave: stats.leave_count,
       unchecked: stats.unchecked_count,
       rate: stats.total > 0 ? ((stats.present_count / stats.total) * 100).toFixed(1) : '0.0',
     };
@@ -56,7 +58,8 @@ router.get('/summary', roleMiddleware('counselor'), (req: Request, res: Response
     SELECT
       COUNT(*) as total_records,
       SUM(CASE WHEN cr.status = 'present' THEN 1 ELSE 0 END) as total_present,
-      SUM(CASE WHEN cr.status = 'absent' THEN 1 ELSE 0 END) as total_absent
+      SUM(CASE WHEN cr.status = 'absent' THEN 1 ELSE 0 END) as total_absent,
+      SUM(CASE WHEN cr.status = 'leave' THEN 1 ELSE 0 END) as total_leave
     FROM check_records cr
     JOIN check_tasks t ON t.id = cr.task_id
     WHERE t.status = 'completed'
@@ -79,6 +82,7 @@ router.get('/summary', roleMiddleware('counselor'), (req: Request, res: Response
       total_records: overall.total_records || 0,
       total_present: overall.total_present || 0,
       total_absent: overall.total_absent || 0,
+      total_leave: overall.total_leave || 0,
       rate: overall.total_records > 0
         ? ((overall.total_present / overall.total_records) * 100).toFixed(1)
         : '0.0',
@@ -117,6 +121,37 @@ router.get('/absent-list', roleMiddleware('counselor'), (req: Request, res: Resp
   res.json({ absentList });
 });
 
+// GET /api/stats/leave-list - Counselor: get leave list for export
+router.get('/leave-list', roleMiddleware('counselor'), (req: Request, res: Response) => {
+  const user = (req as any).user as JwtPayload;
+  const { date, building } = req.query;
+
+  const targetBuilding = building || user.building;
+
+  let sql = `
+    SELECT u.name as student_name, u.username, r.building, r.room_number, r.floor,
+           cr.leave_reason, cr.note, t.start_time as task_date
+    FROM check_records cr
+    JOIN users u ON u.id = cr.student_id
+    JOIN rooms r ON r.id = cr.room_id
+    JOIN check_tasks t ON t.id = cr.task_id
+    WHERE cr.status = 'leave' AND t.status = 'completed'
+  `;
+  let params: any[] = [];
+  if (targetBuilding) {
+    sql += ' AND t.building = ?';
+    params.push(targetBuilding);
+  }
+  if (date) {
+    sql += ' AND date(t.start_time) = ?';
+    params.push(date);
+  }
+  sql += ' ORDER BY t.start_time DESC, r.room_number, u.name';
+
+  const leaveList = db.prepare(sql).all(...params);
+  res.json({ leaveList });
+});
+
 // GET /api/stats/floor-rate - Counselor: attendance rate by floor
 router.get('/floor-rate', roleMiddleware('counselor'), (req: Request, res: Response) => {
   const user = (req as any).user as JwtPayload;
@@ -128,7 +163,8 @@ router.get('/floor-rate', roleMiddleware('counselor'), (req: Request, res: Respo
     SELECT t.floor, t.building,
       COUNT(*) as total,
       SUM(CASE WHEN cr.status = 'present' THEN 1 ELSE 0 END) as present_count,
-      SUM(CASE WHEN cr.status = 'absent' THEN 1 ELSE 0 END) as absent_count
+      SUM(CASE WHEN cr.status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+      SUM(CASE WHEN cr.status = 'leave' THEN 1 ELSE 0 END) as leave_count
     FROM check_records cr
     JOIN check_tasks t ON t.id = cr.task_id
     WHERE t.status = 'completed'
@@ -152,6 +188,7 @@ router.get('/floor-rate', roleMiddleware('counselor'), (req: Request, res: Respo
     total: f.total,
     present: f.present_count,
     absent: f.absent_count,
+    leave: f.leave_count || 0,
     rate: f.total > 0 ? ((f.present_count / f.total) * 100).toFixed(1) : '0.0',
   }));
 

@@ -62,12 +62,27 @@ export function initDB() {
       task_id INTEGER NOT NULL,
       student_id INTEGER NOT NULL,
       room_id INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'unchecked' CHECK(status IN ('present','absent','unchecked')),
+      status TEXT NOT NULL DEFAULT 'unchecked' CHECK(status IN ('present','absent','leave','unchecked')),
       note TEXT DEFAULT '',
+      leave_reason TEXT DEFAULT '',
       checked_at DATETIME,
       FOREIGN KEY(task_id) REFERENCES check_tasks(id),
       FOREIGN KEY(student_id) REFERENCES users(id),
       FOREIGN KEY(room_id) REFERENCES rooms(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS leave_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      leave_date DATE NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+      reviewed_by INTEGER,
+      review_note TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at DATETIME,
+      FOREIGN KEY(student_id) REFERENCES users(id),
+      FOREIGN KEY(reviewed_by) REFERENCES users(id)
     );
   `);
 }

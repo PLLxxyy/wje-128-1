@@ -10,6 +10,7 @@ interface StudentRecord {
   task_id: number;
   status: string;
   note: string;
+  leave_reason: string;
   checked_at: string;
   building: string;
   floor: number;
@@ -22,6 +23,7 @@ interface StudentRecord {
 const statusText: Record<string, string> = {
   present: '已到',
   absent: '缺勤',
+  leave: '请假',
   unchecked: '未点名',
 };
 
@@ -50,6 +52,7 @@ export default function StudentHome({ user }: Props) {
   const totalChecks = completedRecords.length;
   const presentCount = completedRecords.filter(r => r.status === 'present').length;
   const absentCount = completedRecords.filter(r => r.status === 'absent').length;
+  const leaveCount = completedRecords.filter(r => r.status === 'leave').length;
 
   return (
     <div className="page-container">
@@ -67,6 +70,10 @@ export default function StudentHome({ user }: Props) {
         <div className="stat-card stat-red">
           <div className="num">{absentCount}</div>
           <div className="label">缺勤次数</div>
+        </div>
+        <div className="stat-card stat-orange">
+          <div className="num">{leaveCount}</div>
+          <div className="label">请假次数</div>
         </div>
         <div className="stat-card stat-orange">
           <div className="num">{totalChecks > 0 ? ((presentCount / totalChecks) * 100).toFixed(0) : 0}%</div>

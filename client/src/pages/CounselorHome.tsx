@@ -11,6 +11,7 @@ interface FloorRate {
   total: number;
   present: number;
   absent: number;
+  leave: number;
   rate: string;
 }
 
@@ -22,6 +23,7 @@ interface SummaryItem {
   total: number;
   present: number;
   absent: number;
+  leave: number;
   unchecked: number;
   rate: string;
 }
@@ -30,6 +32,7 @@ interface OverallStats {
   total_records: number;
   total_present: number;
   total_absent: number;
+  total_leave: number;
   rate: string;
 }
 
@@ -43,16 +46,29 @@ interface AbsentItem {
   task_date: string;
 }
 
+interface LeaveItem {
+  student_name: string;
+  username: string;
+  building: string;
+  room_number: string;
+  floor: number;
+  leave_reason: string;
+  note: string;
+  task_date: string;
+}
+
 export default function CounselorHome({ user }: Props) {
   const [summary, setSummary] = useState<SummaryItem[]>([]);
-  const [overall, setOverall] = useState<OverallStats>({ total_records: 0, total_present: 0, total_absent: 0, rate: '0.0' });
+  const [overall, setOverall] = useState<OverallStats>({ total_records: 0, total_present: 0, total_absent: 0, total_leave: 0, rate: '0.0' });
   const [floorRates, setFloorRates] = useState<FloorRate[]>([]);
   const [absentList, setAbsentList] = useState<AbsentItem[]>([]);
+  const [leaveList, setLeaveList] = useState<LeaveItem[]>([]);
   const [dateFilter, setDateFilter] = useState('');
   const [buildingFilter, setBuildingFilter] = useState(user.building || '');
   const [buildings, setBuildings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAbsentList, setShowAbsentList] = useState(false);
+  const [showLeaveList, setShowLeaveList] = useState(false);
 
   useEffect(() => {
     loadBuildings();
@@ -100,12 +116,27 @@ export default function CounselorHome({ user }: Props) {
       const data = await api.getAbsentList(params);
       setAbsentList(data.absentList);
       setShowAbsentList(true);
+      setShowLeaveList(false);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const exportCSV = () => {
+  const loadLeaveList = async () => {
+    try {
+      const params: Record<string, string> = {};
+      if (dateFilter) params.date = dateFilter;
+      if (buildingFilter) params.building = buildingFilter;
+      const data = await api.getStatsLeaveList(params);
+      setLeaveList(data.leaveList);
+      setShowLeaveList(true);
+      setShowAbsentList(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const exportAbsentCSV = () => {
     if (absentList.length === 0) {
       alert('暂无缺勤数据可导出');
       return;
@@ -120,6 +151,25 @@ export default function CounselorHome({ user }: Props) {
     const link = document.createElement('a');
     link.href = url;
     link.download = `缺勤名单_${dateFilter || '全部'}_${buildingFilter || '全部楼栋'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportLeaveCSV = () => {
+    if (leaveList.length === 0) {
+      alert('暂无请假数据可导出');
+      return;
+    }
+    const header = '姓名,学号,楼栋,寝室号,楼层,请假日期,请假理由,备注\n';
+    const rows = leaveList.map(l =>
+      `${l.student_name},${l.username},${l.building},${l.room_number},${l.floor}楼,${new Date(l.task_date).toLocaleDateString('zh-CN')},${l.leave_reason || ''},${l.note || ''}`
+    ).join('\n');
+    const csv = '﻿' + header + rows;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `请假名单_${dateFilter || '全部'}_${buildingFilter || '全部楼栋'}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -160,6 +210,10 @@ export default function CounselorHome({ user }: Props) {
           <div className="label">缺勤人次</div>
         </div>
         <div className="stat-card stat-orange">
+          <div className="num">{overall.total_leave || 0}</div>
+          <div className="label">请假人次</div>
+        </div>
+        <div className="stat-card stat-orange">
           <div className="num">{overall.rate}%</div>
           <div className="label">总到寝率</div>
         </div>
@@ -185,6 +239,7 @@ export default function CounselorHome({ user }: Props) {
                     <th>应查人数</th>
                     <th>在寝</th>
                     <th>缺勤</th>
+                    <th>请假</th>
                     <th>到寝率</th>
                   </tr>
                 </thead>
@@ -196,6 +251,7 @@ export default function CounselorHome({ user }: Props) {
                       <td>{f.total}</td>
                       <td className="status-present">{f.present}</td>
                       <td className="status-absent">{f.absent > 0 ? <strong>{f.absent}</strong> : 0}</td>
+                      <td className="status-leave">{f.leave || 0}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div style={{ flex: 1, height: '8px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
@@ -228,6 +284,7 @@ export default function CounselorHome({ user }: Props) {
                     <th>应查</th>
                     <th>在寝</th>
                     <th>缺勤</th>
+                    <th>请假</th>
                     <th>到寝率</th>
                   </tr>
                 </thead>
@@ -240,6 +297,7 @@ export default function CounselorHome({ user }: Props) {
                       <td>{s.total}</td>
                       <td className="status-present">{s.present}</td>
                       <td className="status-absent">{s.absent > 0 ? <strong>{s.absent}</strong> : 0}</td>
+                      <td className="status-leave">{s.leave || 0}</td>
                       <td style={{ fontWeight: 500 }}>{s.rate}%</td>
                     </tr>
                   ))}
@@ -254,7 +312,7 @@ export default function CounselorHome({ user }: Props) {
               <h3 className="card-title" style={{ marginBottom: 0 }}>缺勤名单</h3>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button className="btn btn-outline btn-sm" onClick={loadAbsentList}>查看缺勤名单</button>
-                <button className="btn btn-primary btn-sm" onClick={exportCSV}>导出 CSV</button>
+                <button className="btn btn-primary btn-sm" onClick={exportAbsentCSV}>导出 CSV</button>
               </div>
             </div>
 
@@ -283,6 +341,52 @@ export default function CounselorHome({ user }: Props) {
                           <td>{a.room_number}</td>
                           <td>{new Date(a.task_date).toLocaleDateString('zh-CN')}</td>
                           <td>{a.note || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
+          </div>
+
+          {/* Export leave list */}
+          <div className="card" style={{ marginTop: '20px' }}>
+            <div className="flex-between" style={{ marginBottom: '12px' }}>
+              <h3 className="card-title" style={{ marginBottom: 0 }}>请假名单</h3>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-outline btn-sm" onClick={loadLeaveList}>查看请假名单</button>
+                <button className="btn btn-primary btn-sm" onClick={exportLeaveCSV}>导出 CSV</button>
+              </div>
+            </div>
+
+            {showLeaveList && (
+              leaveList.length === 0 ? (
+                <div className="success-msg">暂无请假记录</div>
+              ) : (
+                <div style={{ padding: 0 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>姓名</th>
+                        <th>学号</th>
+                        <th>楼栋</th>
+                        <th>寝室</th>
+                        <th>请假日期</th>
+                        <th>请假理由</th>
+                        <th>备注</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaveList.map((l, i) => (
+                        <tr key={i}>
+                          <td className="status-leave"><strong>{l.student_name}</strong></td>
+                          <td>{l.username}</td>
+                          <td>{l.building}</td>
+                          <td>{l.room_number}</td>
+                          <td>{new Date(l.task_date).toLocaleDateString('zh-CN')}</td>
+                          <td style={{ maxWidth: '200px' }}>{l.leave_reason || '-'}</td>
+                          <td>{l.note || '-'}</td>
                         </tr>
                       ))}
                     </tbody>

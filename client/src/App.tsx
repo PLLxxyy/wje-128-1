@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import StudentHome from './pages/StudentHome';
+import StudentLeavePage from './pages/StudentLeavePage';
 import AdminHome from './pages/AdminHome';
 import AdminTaskDetail from './pages/AdminTaskDetail';
 import AdminCreateTask from './pages/AdminCreateTask';
+import AdminLeaveApproval from './pages/AdminLeaveApproval';
 import CounselorHome from './pages/CounselorHome';
 import Header from './pages/Header';
 
@@ -59,6 +61,7 @@ export default function App() {
         {user.role === 'student' && (
           <>
             <Route path="/" element={<StudentHome user={user} />} />
+            <Route path="/leaves" element={<StudentLeavePage user={user} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </>
         )}
@@ -67,6 +70,7 @@ export default function App() {
             <Route path="/" element={<AdminHome user={user} />} />
             <Route path="/create-task" element={<AdminCreateTask user={user} />} />
             <Route path="/task/:id" element={<AdminTaskDetail user={user} />} />
+            <Route path="/leaves" element={<AdminLeaveApproval user={user} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </>
         )}

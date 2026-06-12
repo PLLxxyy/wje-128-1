@@ -88,13 +88,22 @@ router.post('/', roleMiddleware('dorm_admin'), (req: Request, res: Response) => 
   ).run(user.id, building, floor, start_time, end_time, 'pending');
 
   const taskId = Number(result.lastInsertRowid);
+  const taskDate = new Date(start_time).toISOString().split('T')[0];
 
-  // Create check records for each student
   const insertRecord = db.prepare(
-    'INSERT INTO check_records (task_id, student_id, room_id, status) VALUES (?, ?, ?, ?)'
+    'INSERT INTO check_records (task_id, student_id, room_id, status, note, leave_reason) VALUES (?, ?, ?, ?, ?, ?)'
   );
   for (const s of students) {
-    insertRecord.run(taskId, s.student_id, s.room_id, 'unchecked');
+    const leave = db.prepare(`
+      SELECT * FROM leave_requests
+      WHERE student_id = ? AND leave_date = ? AND status = 'approved'
+    `).get(s.student_id, taskDate) as any;
+
+    if (leave) {
+      insertRecord.run(taskId, s.student_id, s.room_id, 'leave', '请假', leave.reason);
+    } else {
+      insertRecord.run(taskId, s.student_id, s.room_id, 'unchecked', '', '');
+    }
   }
 
   const task = db.prepare('SELECT * FROM check_tasks WHERE id = ?').get(taskId);
@@ -112,7 +121,6 @@ router.get('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  // Students can only see their own records
   if (user.role === 'student') {
     const record = db.prepare(`
       SELECT cr.*, u.name as student_name, r.room_number, r.building, r.floor
@@ -134,22 +142,35 @@ router.get('/:id', (req: Request, res: Response) => {
     ORDER BY r.room_number, u.name
   `).all(taskId);
 
-  res.json({ task, records });
+  const taskDate = task.start_time ? task.start_time.split('T')[0] : null;
+  let leaveRequests: any[] = [];
+  if (taskDate) {
+    leaveRequests = db.prepare(`
+      SELECT lr.*, u.name as student_name, u.username, r.room_number
+      FROM leave_requests lr
+      JOIN users u ON u.id = lr.student_id
+      LEFT JOIN student_rooms sr ON sr.student_id = lr.student_id
+      LEFT JOIN rooms r ON r.id = sr.room_id
+      WHERE lr.leave_date = ? AND r.building = ?
+    `).all(taskDate, task.building);
+  }
+
+  res.json({ task, records, leave_requests: leaveRequests });
 });
 
 // PUT /api/tasks/:id/records/:recordId - Update a check record (dorm_admin)
 router.put('/:id/records/:recordId', roleMiddleware('dorm_admin'), (req: Request, res: Response) => {
   const recordId = Number(req.params.recordId);
-  const { status, note } = req.body;
+  const { status, note, leave_reason } = req.body;
 
-  if (!['present', 'absent'].includes(status)) {
+  if (!['present', 'absent', 'leave'].includes(status)) {
     res.status(400).json({ error: '无效的状态' });
     return;
   }
 
   db.prepare(
-    'UPDATE check_records SET status = ?, note = ?, checked_at = CURRENT_TIMESTAMP WHERE id = ?'
-  ).run(status, note || '', recordId);
+    'UPDATE check_records SET status = ?, note = ?, leave_reason = ?, checked_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).run(status, note || '', leave_reason || '', recordId);
 
   const record = db.prepare('SELECT * FROM check_records WHERE id = ?').get(recordId);
   res.json({ record });
@@ -165,7 +186,23 @@ router.post('/:id/submit', roleMiddleware('dorm_admin'), (req: Request, res: Res
     return;
   }
 
-  // Mark any unchecked records as absent
+  const taskDate = task.start_time ? task.start_time.split('T')[0] : null;
+
+  if (taskDate) {
+    db.prepare(`
+      UPDATE check_records
+      SET status = 'leave', note = '请假', leave_reason = (
+        SELECT reason FROM leave_requests
+        WHERE student_id = check_records.student_id AND leave_date = ? AND status = 'approved'
+        LIMIT 1
+      ), checked_at = CURRENT_TIMESTAMP
+      WHERE task_id = ? AND status = 'unchecked' AND student_id IN (
+        SELECT student_id FROM leave_requests
+        WHERE leave_date = ? AND status = 'approved'
+      )
+    `).run(taskDate, taskId, taskDate);
+  }
+
   db.prepare(
     `UPDATE check_records SET status = 'absent', note = '未点名自动标记', checked_at = CURRENT_TIMESTAMP
      WHERE task_id = ? AND status = 'unchecked'`

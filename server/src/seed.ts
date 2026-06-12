@@ -70,27 +70,53 @@ export function seed() {
   const yesterdayEnd = new Date(yesterday);
   yesterdayEnd.setHours(23, 0, 0, 0);
 
-  insertTask.run(7, '1号楼', 1, yesterday.toISOString(), yesterdayEnd.toISOString(), 'completed');
-
-  // Create check records for the completed task
-  const insertRecord = db.prepare(
-    'INSERT INTO check_records (task_id, student_id, room_id, status, note, checked_at) VALUES (?, ?, ?, ?, ?, ?)'
-  );
-  insertRecord.run(1, 1, 1, 'present', '', yesterdayEnd.toISOString());
-  insertRecord.run(1, 2, 2, 'absent', '请假回家', yesterdayEnd.toISOString());
-  insertRecord.run(1, 3, 3, 'present', '', yesterdayEnd.toISOString());
-
-  // Create today's pending task
   const today = new Date();
   today.setHours(22, 0, 0, 0);
   const todayEnd = new Date(today);
   todayEnd.setHours(23, 0, 0, 0);
 
+  insertTask.run(7, '1号楼', 1, yesterday.toISOString(), yesterdayEnd.toISOString(), 'completed');
+
+  // Create a sample approved leave request for yesterday
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  db.prepare(
+    'INSERT INTO leave_requests (student_id, leave_date, reason, status, reviewed_by, review_note, reviewed_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(2, yesterdayStr, '回家参加家庭聚会', 'approved', 7, '同意', yesterdayEnd.toISOString());
+
+  // Create a sample pending leave request for today
+  const todayStr = today.toISOString().split('T')[0];
+  db.prepare(
+    'INSERT INTO leave_requests (student_id, leave_date, reason, status) VALUES (?, ?, ?, ?)'
+  ).run(4, todayStr, '去医院看病', 'pending');
+
+  // Create check records for the completed task
+  const insertRecord = db.prepare(
+    'INSERT INTO check_records (task_id, student_id, room_id, status, note, leave_reason, checked_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+  insertRecord.run(1, 1, 1, 'present', '', '', yesterdayEnd.toISOString());
+  insertRecord.run(1, 2, 2, 'leave', '请假', '回家参加家庭聚会', yesterdayEnd.toISOString());
+  insertRecord.run(1, 3, 3, 'present', '', '', yesterdayEnd.toISOString());
+
   insertTask.run(7, '1号楼', 2, today.toISOString(), todayEnd.toISOString(), 'pending');
 
-  // Create check records for today's task (unchecked)
-  insertRecord.run(2, 4, 5, 'unchecked', '', null);
-  insertRecord.run(2, 5, 6, 'unchecked', '', null);
+  // Create check records for today's task - check for approved leave first
+  const leaveForToday = db.prepare(`
+    SELECT * FROM leave_requests
+    WHERE student_id = ? AND leave_date = ? AND status = 'approved'
+  `);
+  const student4Leave = leaveForToday.get(4, todayStr) as any;
+  const student5Leave = leaveForToday.get(5, todayStr) as any;
+
+  if (student4Leave) {
+    insertRecord.run(2, 4, 5, 'leave', '请假', student4Leave.reason, null);
+  } else {
+    insertRecord.run(2, 4, 5, 'unchecked', '', '', null);
+  }
+  if (student5Leave) {
+    insertRecord.run(2, 5, 6, 'leave', '请假', student5Leave.reason, null);
+  } else {
+    insertRecord.run(2, 5, 6, 'unchecked', '', '', null);
+  }
 
   console.log('Database seeded successfully!');
 }

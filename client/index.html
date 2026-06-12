@@ -49,6 +49,7 @@
       tr:hover { background: #fafafa; }
       .status-present { color: #52c41a; font-weight: 500; }
       .status-absent { color: #ff4d4f; font-weight: 600; }
+      .status-leave { color: #fa8c16; font-weight: 500; }
       .status-unchecked { color: #999; }
       .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; }
       .badge-pending { background: #fff7e6; color: #fa8c16; }
@@ -66,6 +67,7 @@
       .record-actions button { padding: 6px 16px; border-radius: 4px; font-size: 13px; }
       .record-actions .active-present { background: #52c41a; color: white; }
       .record-actions .active-absent { background: #ff4d4f; color: white; }
+      .record-actions .active-leave { background: #fa8c16; color: white; }
       .record-actions .inactive { background: #f5f5f5; color: #999; }
       .empty-state { text-align: center; padding: 60px 20px; color: #999; }
       .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
@@ -87,6 +89,9 @@
       .text-muted { color: #999; font-size: 13px; }
       .clickable { cursor: pointer; }
       .clickable:hover { color: #1890ff; }
+      .nav-item { background: transparent; color: rgba(255,255,255,0.8); padding: 6px 16px; border-radius: 4px; font-size: 14px; transition: all 0.2s; }
+      .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+      .nav-item.active { background: rgba(255,255,255,0.2); color: white; font-weight: 500; }
     </style>
   </head>
   <body>

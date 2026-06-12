@@ -58,10 +58,10 @@ export const api = {
 
   getTaskDetail: (id: number) => request(`/tasks/${id}`),
 
-  updateRecord: (taskId: number, recordId: number, status: string, note: string) =>
+  updateRecord: (taskId: number, recordId: number, status: string, note: string, leave_reason?: string) =>
     request(`/tasks/${taskId}/records/${recordId}`, {
       method: 'PUT',
-      body: JSON.stringify({ status, note }),
+      body: JSON.stringify({ status, note, leave_reason }),
     }),
 
   startTask: (id: number) =>
@@ -84,8 +84,38 @@ export const api = {
     return request(`/stats/absent-list${qs}`);
   },
 
+  getStatsLeaveList: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request(`/stats/leave-list${qs}`);
+  },
+
   getFloorRate: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request(`/stats/floor-rate${qs}`);
   },
+
+  getLeaveList: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request(`/leaves${qs}`);
+  },
+
+  submitLeave: (data: { leave_date: string; reason: string }) =>
+    request('/leaves', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  approveLeave: (id: number, review_note?: string) =>
+    request(`/leaves/${id}/approve`, {
+      method: 'PUT',
+      body: JSON.stringify({ review_note }),
+    }),
+
+  rejectLeave: (id: number, review_note?: string) =>
+    request(`/leaves/${id}/reject`, {
+      method: 'PUT',
+      body: JSON.stringify({ review_note }),
+    }),
+
+  getPendingLeaveCount: () => request('/leaves/pending/count'),
 };

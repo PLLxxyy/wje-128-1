@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js';
 import taskRoutes from './routes/tasks.js';
 import recordRoutes from './routes/records.js';
 import statsRoutes from './routes/stats.js';
+import leaveRoutes from './routes/leaves.js';
 
 const app = express();
 const PORT = 3000;
@@ -25,6 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/records', recordRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/leaves', leaveRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
