@@ -136,7 +136,7 @@ router.put('/:id/approve', roleMiddleware('dorm_admin'), (req: Request, res: Res
     const updateRecord = db.prepare(`
       UPDATE check_records
       SET status = 'leave', leave_reason = ?, note = '请假', checked_at = CURRENT_TIMESTAMP
-      WHERE task_id = ? AND student_id = ?
+      WHERE task_id = ? AND student_id = ? AND status != 'present'
     `);
     for (const task of tasks) {
       updateRecord.run(leave.reason, task.id, leave.student_id);
